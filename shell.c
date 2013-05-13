@@ -67,10 +67,33 @@ char *args[100] = {};
    				 
    				args[argCount] = (char *)0;
    				
+   				      
+   				int k;               
+                for(k = 0; k < argCount + 1; k++) {
+                	if(args[k] != NULL) {
+                		if(*args[k] == '>') {
+                			printf("found");
+                	
+                		}
+                	
+                		if(*args[k] == '<') {
+                			printf("found1");
+                		}	
+                }
+                
+                break;
+                	
+                	
+                
+                
+                
+                }
+   				
    				free_tokenizer( tokenizer ); /* free memory */
                 
                 pid = fork();
                 if(!pid) {
+                
                         execvp(args[0],args);
                 }
 
