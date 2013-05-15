@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include "tokenizer.h"
-
+#include <sys/wait.h>
 /*
  * File: Shell.c 
  * Author: Marc Leef 
