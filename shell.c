@@ -15,15 +15,15 @@
 
 char *my_strcpy(char* dest, char* source)
 {
-dest = malloc(1024);
-int i = 0;
-while (source[i] != '\0')
-{
-dest[i] = source[i];
-i++;
-}
-dest[i] = '\0';
-return(dest);
+	dest = malloc(1024);
+	int i = 0;
+	while (source[i] != '\0')
+	{
+		dest[i] = source[i];
+		i++;
+	}
+	dest[i] = '\0';
+	return(dest);
 }
 
 
@@ -40,6 +40,7 @@ int pid;
 char *input;
 char *tok; 
 char *args[100] = {};
+setvbuf (stdout, NULL, _IONBF, 0);
 
 
 
@@ -67,32 +68,49 @@ char *args[100] = {};
    				 
    				args[argCount] = (char *)0;
    				
-   				      
-   				int k;               
+                int k;
+                int in, out = 0;             
                 for(k = 0; k < argCount + 1; k++) {
                 	if(args[k] != NULL) {
+                
                 		if(*args[k] == '>') {
-                			printf("found");
+                			in = 1;
                 	
                 		}
                 	
                 		if(*args[k] == '<') {
-                			printf("found1");
+                			out = 1;
                 		}	
+                	}
+                	
+                	else {
+                		break;
+                	}
                 }
                 
-                break;
+                
                 	
-                	
                 
                 
                 
-                }
    				
    				free_tokenizer( tokenizer ); /* free memory */
                 
                 pid = fork();
                 if(!pid) {
+                
+                	if (in)	{
+        				int fd0 = open(input, O_RDONLY, 0);
+        				dup2(fd0, STDIN_FILENO);
+        				close(fd0);
+    				}
+
+    				if (out)
+    				{
+        				int fd1 = creat(output, 0644);
+        				dup2(fd1, STDOUT_FILENO);
+        				close(fd1);
+   					}
                 
                         execvp(args[0],args);
                 }
