@@ -71,7 +71,7 @@ int main(int argc, char *argv[], char *envp[]) {
 		args[argCount] = (char *)0;
 		
 		int k;
-		int fence1, fence2 = 0;
+		int fence1 = 0;
 		int in, out = 0;
 		char *inp;
 		char *outp; 
@@ -96,7 +96,8 @@ int main(int argc, char *argv[], char *envp[]) {
 					in = 1;
 					if(args[k-1] != NULL) {
 						inp = args[k-1];
-						fence2 = k;
+						args[k] = args[k+1];
+						args[k+1] = 0;
 					}
 				}
 				
@@ -115,12 +116,6 @@ int main(int argc, char *argv[], char *envp[]) {
 		
 		if(!inp && outp) {
 			for(fence1 = fence1; fence1 < argCount; fence1++) {
-				args[fence1] = 0;
-			}
-		}
-		
-		if(inp && !outp) {
-			for(fence2 = fence2; fence1 < argCount; fence1++) {
 				args[fence1] = 0;
 			}
 		}
