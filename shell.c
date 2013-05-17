@@ -13,6 +13,33 @@
  */
  
  
+void sigchild_handler(int signum){
+		int pid, status;
+		while(1){
+			pid  = waitpid(WAIT_ANY, &status, WNOHANG);
+			if(pid < 0){
+				perror("waitpid");
+				break;
+			}
+			if(pid == 0){
+				break;
+			}
+			
+		}
+	
+}
+
+void bg() {
+
+
+}
+
+void fg() {
+
+
+}
+
+ 
 void parseArgs(char* a[], int args) {
 		int k;
 		int fence1, fence2 = 0;
@@ -25,6 +52,8 @@ void parseArgs(char* a[], int args) {
 		inp = 0;
 		outp = 0;    
 		int p = 0;   
+		
+		
 		for(k = 0; k < args + 1; k++) {
 			if(a[k] != NULL) {
                 
@@ -71,6 +100,7 @@ void parseArgs(char* a[], int args) {
 						w++;
 					}
 					p = 1;
+					break;
 				}
 				
 			}
@@ -78,6 +108,12 @@ void parseArgs(char* a[], int args) {
 			else {
 				break;
 			}
+			
+			if(*a[args-1] == '&'){
+				a[args-1] = 0;
+				signal(SIGCHLD, sigchild_handler);
+			}
+			
 		}
 		
 		if(!inp && outp && !p) {
@@ -148,11 +184,11 @@ void parseArgs(char* a[], int args) {
 				}
 			
 				else {
-						dup2(pipefd[0], 0);
-						close(pipefd[1]);
-						parseArgs(pright, rightSize);
-						setpgid (pid2, 0);
-						execvp(pright[0], pright);
+					dup2(pipefd[0], 0);
+					close(pipefd[1]);
+					parseArgs(pright, rightSize);
+					setpgid (pid2, 0);
+					execvp(pright[0], pright);
 				}
 
 			}
@@ -218,8 +254,23 @@ int main(int argc, char *argv[], char *envp[]) {
 		
 		pid = fork();
 		if(!pid) {
-			parseArgs(args, argCount);
-			execvp(args[0],args);
+		
+			char *background = "bg";
+			char *foreground = "fg";
+		
+			if(*args[0] == *background) {
+				bg();
+			}
+		
+			else if(*args[0] == *foreground) {
+				fg();
+			}
+			
+			else {
+				parseArgs(args, argCount);
+				execvp(args[0],args);
+			}
+			
 		}
 		
 		else {
