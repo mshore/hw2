@@ -4,80 +4,101 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include "tokenizer.h"
+#include "job.h"
+
+#define MAXJOBS 20
 
 /*
- * File: Shell.c 
- * Authors: Marc Leef, Matt Shore
- * Date: 5/27/13
- * Implementation of the fully featured shell for project 2. 
- */
- 
- 
-void sigchild_handler(int signum){
-		int pid, status;
-		while(1){
-			pid  = waitpid(WAIT_ANY, &status, WNOHANG);
-			if(pid < 0){
-				perror("waitpid");
-				break;
-			}
-			if(pid == 0){
-				break;
-			}
-			
+* File: Shell.c 
+* Authors: Marc Leef, Matt Shore
+* Date: 5/27/13
+* Implementation of the fully featured shell for project 2. 
+*/
+
+
+job backgroundJobs[MAXJOBS];
+job allJobs[MAXJOBS];
+job jobHistory[MAXJOBS];
+
+job mostRecentlyStopped;
+
+
+int bgpCount=0;
+int jobCount = 0;
+int pCount = 0;
+int finishedMessage = 0;
+int stoppedMessage = 0;
+char* finishedJob;
+char* stoppedJob;
+pid_t bgPID = 0;
+pid_t fgPID = 0;
+pid_t mainPID = 0;
+
+
+void removeAmpersand(char* a) {
+int i = 0;
+while (a[i] != '\0')
+	{
+		if(a[i] == '&') {
+			a[i] = '\0';
+			break;
 		}
-	
-}
-
-void bg() {
-
+		i++;
+	}
 
 }
 
-void fg() {
-
+int isBGP(char* a[], int args) {
+	if(*a[args-1] == '&') {
+		a[args-1] = 0;
+		return 1;
+	}
+	return 0;
 
 }
-
- 
 void parseArgs(char* a[], int args) {
 		int k;
-		int fence1, fence2 = 0;
-		int in, out = 0;
+		int fence1 = 0;
+		int fence2 = 0;
+		int in = 0;
+		int out = 0;
 		char *inp;
 		char *outp; 
 		char *pleft[50] = {};
 		char *pright[50] = {}; 
-		int leftSize, rightSize = 0;
-		inp = 0;
-		outp = 0;    
-		int p = 0;   
-		
-		
+		int leftSize = 0;
+		int rightSize = 0;
+		int isInp = 0;
+		int isOutp = 0;    
+		int isPipe = 0;  
 		for(k = 0; k < args + 1; k++) {
 			if(a[k] != NULL) {
-                
+
 				if(*a[k] == '>') {
+					//printf("1 \n"); 
 					out = 1;
 					if(a[k+1] != NULL) {
-						if(!outp) {
-						outp = a[k+1];
-						fence1 = k;
+						if(!isOutp) {
+							outp = a[k+1];
+							fence1 = k;
+							isOutp = 1;
 						}
 						else {
 							perror("Incorrect Use of Redirection");
 							exit(0);
 						}
 					}
-                	
+               	
 				}
 				
 				if(*a[k] == '<') {
+					//printf("2 \n"); 
 					in = 1;
 					if(a[k+1] != NULL) {
-						if(!inp) {
+						if(!isInp) {
 							inp = a[k+1];
 							fence2 = k;
+							isInp = 1;
 						}
 						
 						else {
@@ -88,6 +109,7 @@ void parseArgs(char* a[], int args) {
 				}
 				
 				if(*a[k] == '|') {
+					//printf("3 \n"); 
 					int i;
 					for(i = 0; i < k; i++) {
 						pleft[i] = a[i];
@@ -99,47 +121,37 @@ void parseArgs(char* a[], int args) {
 						rightSize++;
 						w++;
 					}
-					p = 1;
-					break;
+					isPipe = 1;
 				}
 				
 			}
 			
-			else {
+			else {	
 				break;
 			}
-			
-			if(*a[args-1] == '&'){
-				a[args-1] = 0;
-				signal(SIGCHLD, sigchild_handler);
-			}
-			
 		}
 		
-		if(!inp && outp && !p) {
+		if(!isInp && isOutp && !isPipe) {
 			for(fence1 = fence1; fence1 < args; fence1++) {
 				a[fence1] = 0;
 			}
 		}
 		
-		if(inp && !outp && !p) {
-			a[fence2] = a[fence2+1];
-			a[fence2+1] = 0;
+		else if(isInp && !isOutp && !isPipe) {
+			for(fence2 = fence2; fence2 < args; fence2++) {
+				a[fence2] = 0;
+			}
 		}
 		
-		if(inp && outp && !p) {
+		else if(isInp && isOutp && !isPipe) {
 			if(fence2 < fence1) {
-				for(fence1 = fence1; fence1 < args; fence1++) {
-					a[fence1] = 0;
+				for(fence2 = fence2; fence2 < args; fence2++) {
+					a[fence2] = 0;
 				}
-				a[fence2] = a[fence2+1];
-				a[fence2+1] = 0;
 			}
 			
 			else {
-				a[fence1] = a[fence2 + 1];
-				a[fence2 + 1] = 0;
-				for(fence1 = fence1+1; fence1 < fence2 + 1; fence1++) {
+				for(fence1 = fence1; fence1 < args; fence1++) {
 					a[fence1] = 0;
 				}
 			
@@ -147,19 +159,24 @@ void parseArgs(char* a[], int args) {
 			
 		}
 
-/*		
+		
 			if (in)
 			{
-				int fd0 = open(inp, O_WRONLY | O_CREAT | O_TRUNC, 0);
+				//printf("5 \n"); 
+				int fd0 = open(inp, O_RDONLY);
+				if(fd0 < 0) {
+					perror("");
+				}
 				dup2(fd0, STDIN_FILENO);
 				close(fd0);
 				in = 0;
 			}
-*/
+
 			
 					
 			if (out)
 			{
+				//printf("6 \n"); 
 				int fd1 = creat(outp, 0644);
 				if(fd1 < 0) {
 					perror("");
@@ -170,7 +187,8 @@ void parseArgs(char* a[], int args) {
 			}
 
 		
-			if(p) {
+			if(isPipe) {
+				//printf("7 \n"); 
 				int pipefd[2];
 				pipe(pipefd);
 				int pid2 = fork();
@@ -194,7 +212,93 @@ void parseArgs(char* a[], int args) {
 			}
 }
 
-char *my_strcpy(char* dest, char* source)
+
+void execute(char* args[], int argCount, char* input) {
+	pid_t pid=fork();
+	int bgp = isBGP(args, argCount);
+	if(!bgp)
+	{
+		if(pid<0)
+		{
+			perror("Fork Error");
+			exit(0);
+		}
+		else if (pid==0)
+		{
+			parseArgs(args, argCount);
+			tcsetpgrp (0, pid);
+			if(execvp(args[0],args)<0)
+			{
+				perror("Improper Command");
+				exit(0);
+			}
+		}
+		else
+		{
+			allJobs[jobCount].jobArgs = input;
+			allJobs[jobCount].pid=pid;
+			allJobs[jobCount].bg=0;
+			
+			jobHistory[jobCount].jobArgs = input;
+			jobHistory[jobCount].pid=pid;
+			jobHistory[jobCount].bg=0;
+			
+			jobCount++;
+			fgPID = pid;
+			wait(NULL);
+		}
+	}
+	else if (bgp)
+	{
+		if(pid<0)
+		{
+			perror("Fork Error");
+			exit(0);
+		}
+		else if (pid==0)
+		{
+			parseArgs(args, argCount);
+			if(execvp(args[0],args)<0)
+			{
+				perror("Improper Command");
+				exit(0);
+			}
+		}
+		else
+		{
+		
+			
+			jobHistory[jobCount].jobArgs = input;
+			jobHistory[jobCount].pid=pid;
+			jobHistory[jobCount].bg=0;
+			jobCount++;
+			
+			
+			backgroundJobs[bgpCount].jobArgs = input;
+			char* temp = jobStarted(backgroundJobs[bgpCount]);
+			removeAmpersand(temp);
+			printf("Running: %s\n", temp);
+			bgPID = pid;
+			backgroundJobs[bgpCount].pid=pid;
+			backgroundJobs[bgpCount++].bg=1;
+		}
+	}
+}
+
+void fg() {
+	char* temp = jobStarted(mostRecentlyStopped);
+	printf("Running: %s\n", temp);
+	kill(mostRecentlyStopped.pid, SIGCONT);
+}
+
+void bg() {
+	char* temp = jobStarted(mostRecentlyStopped);
+	printf("Running: %s\n", temp);
+	kill(mostRecentlyStopped.pid, SIGCONT);
+
+}
+
+char *stringCopy(char* dest, char* source)
 {
 	dest = malloc(1024);
 	int i = 0;
@@ -207,25 +311,109 @@ char *my_strcpy(char* dest, char* source)
 	return(dest);
 }
 
+void SIGTSTP_handler(int signum) {
+	int i;
+	if(bgPID) {
+		for(i=0;i<bgpCount;i++)
+		{
+			if(backgroundJobs[i].pid==bgPID)
+			{	
+					mostRecentlyStopped.pid = bgPID;
+					char* t = backgroundJobs[i].jobArgs;
+					mostRecentlyStopped.jobArgs = stringCopy(mostRecentlyStopped.jobArgs, t);
+					
+					stoppedMessage = 1;
+					finishedMessage = 0;
+					char* temp = jobFinished(backgroundJobs[i]);
+					stoppedJob = stringCopy(stoppedJob, temp);
+					removeAmpersand(stoppedJob);
+					kill(bgPID, SIGKILL);
+					printf("\nStopped: %s \n", stoppedJob);	
+					int j = write(1, "shredder# ", 10);
+					if(j < 0) {
+						perror("");
+					}
+					bgPID = 0;
+			}
+		}
+	}
+	else if(fgPID){
+		for(i=0;i<jobCount;i++)
+		{
+			if(allJobs[i].pid==fgPID)
+			{	
+					mostRecentlyStopped.pid = fgPID;
+					char* t = allJobs[i].jobArgs;
+					mostRecentlyStopped.jobArgs = stringCopy(mostRecentlyStopped.jobArgs, t);
+					char* temp = jobFinished(allJobs[i]);
+					stoppedJob = stringCopy(stoppedJob, temp);
+					removeAmpersand(stoppedJob);
+					kill(fgPID, SIGKILL);
+					printf("\nStopped: %s \n", stoppedJob);	
+					fgPID = 0;
+			}
+		}
+	}
+	
+	else {
+		printf("\nNo processes to stop. \n");	
+		int j = write(1, "shredder# ", 10);
+		if(j < 0) {
+			perror("");
+		}
+	}
+	signal(SIGTSTP, SIGTSTP_handler);
+	return;
 
+}
+
+void SIGCHLD_handler(int signum) {
+	int pid;
+	int i;
+	pid = waitpid(WAIT_ANY, NULL, WNOHANG);
+	for(i=0;i<bgpCount;i++)
+	{
+		if(backgroundJobs[i].pid==pid)
+		{
+			if(!stoppedMessage) {
+				finishedMessage = 1;
+				char* temp = jobFinished(backgroundJobs[i]);
+				finishedJob = stringCopy(finishedJob, temp);
+				removeAmpersand(finishedJob);
+			}
+			stoppedMessage = 0;
+		}
+	}
+	signal(SIGCHLD, SIGCHLD_handler);
+	return;
+}
 
 
 /*
- * Execution of shell, loops continually, takes input, and starts/times new processes
- */
+* Execution of shell, loops continually, takes input, and starts/times new processes
+*/
 int main(int argc, char *argv[], char *envp[]) {
 	TOKENIZER *tokenizer;
-	int process;
 	int argCount = 0;
-	int pid;
 	char *input;
 	char *tok; 
 	char *args[100] = {};
+	char *bgCalled = "bg";
+	char *fgCalled = "fg";
 	setvbuf (stdout, NULL, _IONBF, 0);
+	signal(SIGCHLD,SIGCHLD_handler);
+	signal(SIGTSTP, SIGTSTP_handler);
+	
+	mainPID = getpid();
+	tcsetpgrp (0, mainPID);
 	
 	
-	
-	while(1) {
+while(1) {
+		if(finishedMessage) {
+			printf("Finished: %s \n", finishedJob);
+			finishedMessage = 0;
+		}
+		
 		int j = write(1, "shredder# ", 10);
 		if(j < 0) {
 			perror("");
@@ -236,13 +424,15 @@ int main(int argc, char *argv[], char *envp[]) {
 		if(i < 0) {
 			perror("");
 		}
-		
+		if(!input) {
+			continue;
+		}
 		input[i-1] = '\0';
 		tokenizer = init_tokenizer(input);
 		
 		while( (tok = get_next_token( tokenizer )) != NULL ) {
 			char* temp;
-			temp = my_strcpy(temp, tok);
+			temp = stringCopy(temp, tok);
 			args[argCount] = temp;
 			free( tok );    /* free the token now that we're done with it */
 			argCount = argCount + 1;
@@ -252,46 +442,34 @@ int main(int argc, char *argv[], char *envp[]) {
 		
 		free_tokenizer( tokenizer ); /* free memory */
 		
-		pid = fork();
-		if(!pid) {
-		
-			char *background = "bg";
-			char *foreground = "fg";
-		
-			if(*args[0] == *background) {
-				bg();
-			}
-		
-			else if(*args[0] == *foreground) {
-				fg();
-			}
-			
-			else {
-				parseArgs(args, argCount);
-				execvp(args[0],args);
-			}
-			
+		if(*args[0] == *bgCalled) {
+			bg();
 		}
 		
+		else if(*args[0] == *fgCalled) {
+			fg();
+		}
 		else {
-			wait(&process);
+			execute(args,argCount,input);
 		}
+		
 		int m;
 		for(m = 0; m < argCount; m++)
 		{
+			free(args[m]);
 			args[m] = 0;
 		}
 		argCount = 0;
 		free(input);
 		
-	}
+		}
+	
+		bgpCount = 0;	
+		jobCount = 0;
+			
+		}
+		
+		
+		
 	
 	
-	
-	
-	
-	
-}
-
-
-
