@@ -4,14 +4,14 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include "tokenizer.h"
-
+<<<<<<< HEAD
 #include <sys/wait.h>
-
+=======
 #include "job.h"
 
 #define MAXJOBS 20
 
-
+>>>>>>> 7644d79f3bfb1c53c113bb54c4f131131d9c40f0
 /*
 * File: Shell.c 
 * Authors: Marc Leef, Matt Shore

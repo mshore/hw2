@@ -1,7 +1,7 @@
 CFLAGS=-g -Wall
 CC=gcc
-SRCS=tokenizer.c shell.c
-OBJS=tokenizer.o shell.o
+SRCS=tokenizer.c shell.c job.c
+OBJS=tokenizer.o shell.o job.o
 LDFLAGS=-g
 LIBS=
 

@@ -1,0 +1,45 @@
+NAME: Marc Leef
+
+SUBMITTED SOURCE FILES: "shell.c" (main assignment source) , "hello.c" (added system call source) , "sysHello.c" (system call test program source)
+SUBMITTED TEXT FILES: "README" , "Syscall Output" , "My Shell Executing Syscall" 
+
+EXTRA CREDIT ANSWERS:
+SIGSTOP is the other signal that cannot be ignored by processes. Both pause(2) and sigsuspend(2) will terminate the process if 
+the signal is not handled. Additionally, there are 32 "Real-time Signals" supported in Linux which will similarly terminate the 
+given process if not handled. This information can be found in the signal(7) man page.
+NOTE: I also wrote the custom atoi method for extra credit
+
+COMPILATION INSTRUCTIONS: Simply typing "make" in the directory will compile my shell to an executable called "shredder". 
+Typing "make clean" will remove the compiled binary.
+
+OVERVIEW: I feel very good about the shell that I've created. It does everything required for this assignment with no visible errors or 
+bugs that I can see. I used Valgrind to check the memory usage and thankfully found that there were no memory leaks. Adding my own system 
+call was an arduous and frustrating task, but I managed to add a simple one by closely following Dave's tutorial. All it does is print, "Look mom 
+I made a system call!" which I am still very proud of.
+
+CODE LAYOUT:
+The first thing written in my code is my own atoi() method. The next thing is my handler for the SIGALRM which tries to kill the currently
+running process and prints the snarky message if successful. Then, there is my shell. I really just followed the pseudocode provided in the 
+assignment, the shell waits for input, then tries to start a new process based on that input. I have a "processKilled" boolean which keeps track
+of whether or not the process has been killed, which I needed to make sure that certain messages didn't print when they weren't supposed to. Additionally,
+I have a number of perror() calls which check for bad read/writes as well as checking if the commands entered are valid processes or not. If the process
+is not valid (either gibberish or just blank input), the process is immediately killed and the shell exits. My system call code uses the same example
+code from Dave's System Call Tutorial with slightly changed text output to the kernel. 
+
+GENERAL COMMENTS:
+The file "Syscall Output" contains the log information that shows my added system call being executed, and the "My Shell Executing Syscall"
+file demonstrates my shell executing said system call by running a program that calls it, and then subsequently printing out the log file
+to show that it executed. My system call and the program that executes the system call are both slightly modified versions of the code from 
+Dave's tutorial on how to implement a system call. I didn't attempt anything past a simple printing system call as the process seemed far 
+too intimidating already. 
+
+NUMBER OF HOURS/LEVEL OF DIFFICULTY:
+I spent about 15 hours on this assignment give or take. I found it very frustrating at times because
+I hit walls where I could no longer be productive without the fantastic assistance of Dave or one of
+the delightful class oracles. Hitting those walls was annoying because it meant I could no longer work
+on the assignment until I had resolved these issues with helpers, and waiting to get that help was hard
+because all I wanted to do was finish the assignment. As a result, it was very fulfilling to finally get it
+all running and working correctly. The difficulty came not from the problem itself being difficult, but rather,
+having to familiarize myself with C and its (annoying) subtleties along the way. The system call was not fun to
+implement, kernel recompilation is just as bad as it was purported to be.	
+
